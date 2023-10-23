@@ -3,65 +3,115 @@ import axios from "axios";
 import AddAccident from "./accident/AddAccident.jsx";
 import UpdateAccident from "./accident/UpdateAccident.jsx";
 import DeleteAccident from "./accident/DeleteAccident.jsx";
+import ViewAccidentModal from "./ViewAccidentModal.jsx";
+import "./ViewAccidentModal.css";
 
 const Accident = () => {
   const [name, setName] = useState("");
-  const [accidents, setAccidents] = useState([])
+  const [accidents, setAccidents] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedVehicleType, setSelectedVehicleType] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedAccident, setSelectedAccident] = useState(null);
+  const [actionStatus, setActionStatus] = useState([]); 
+  const [selectedTab, setSelectedTab] = useState("All");
+  const [assignedUsers, setAssignedUsers] = useState(new Array(accidents.length).fill(''));
+
   
+
   useEffect(() => {
     getUser();
     getAccidents();
   }, []);
 
   const getUser = () => {
-    //const token = localStorage.getItem("token");
     axios.get(`http://localhost:5000/api/user`)
-    .then(result => {
-      console.log(result)
-      setName(result.data)
-    })
-    .catch(err => console.log(err))
+      .then((result) => {
+        console.log(result);
+        setName(result.data);
+      })
+      .catch((err) => console.log(err));
   };
 
   const getAccidents = () => {
-    //const token = localStorage.getItem("token");
     axios.get(`http://localhost:5000/api/accident-report`)
-    .then(result => {
-      console.log(result)
-      setAccidents(result.data)
-    })
-    .catch(err => console.log(err))
+      .then((result) => {
+        console.log(result);
+        setAccidents(result.data);
+        const initialActionStatus = result.data.map((accident) => accident.action_status);
+        setActionStatus(initialActionStatus); 
+      })
+      .catch((err) => console.log(err));
   };
 
-  const filteredAccidents = accidents.filter((accident) => {
+  const handleTabClick = (tab) => {
+    setSelectedTab(tab);
+  };
+
+  
+  const filteredAccidentsByStatus = () => {
+    if (selectedTab === "All") {
+      return filteredAccidents;
+    } else {
+      return filteredAccidents.filter((accident, index) => {
+        return actionStatus[index] === selectedTab;
+      });
+    }
+  };
+  
+
+  const filteredAccidents = accidents.filter((accident, index) => {
     const searchString = searchQuery.toLowerCase();
     const accidentMonth = new Date(accident.date).toLocaleString("default", { month: "long" });
 
     return (
       (accident.location.toLowerCase().includes(searchString) ||
-      accident.description.toLowerCase().includes(searchString)) &&
+        accident.description.toLowerCase().includes(searchString)) &&
       (!selectedVehicleType || accident.vehicle_type === selectedVehicleType) &&
       (!selectedLocation || accident.location === selectedLocation) &&
       (!selectedMonth || accidentMonth === selectedMonth)
     );
   });
-  
-  const Checkbox = ({ checked }) => (
-    <input type="checkbox" checked={checked} disabled readOnly />
-  )
 
-  const caseClosed = ({id}) => {
-    axios.put(`http://localhost:5000/api/solved-accident/solve-accident-report/${id}`)
-    .then(result => {
-      console.log(result)
-      window.location.reload()
+  
+  const openModal = (accidentData) => {
+    setSelectedAccident(accidentData);
+  };
+
+ 
+  const closeModal = () => {
+    setSelectedAccident(null);
+  };
+
+  const updateActionStatus = (index, newStatus) => {
+    const updatedStatus = [...actionStatus];
+    updatedStatus[index] = newStatus;
+    setActionStatus(updatedStatus);
+  
+    
+    axios.put(`http://localhost:5000/api/accident-report/${accidents[index]._id}/action-status`, {
+      actionStatus: newStatus,
     })
-    .catch(err => console.log(err));
-  }
+    .then((response) => {
+      console.log('Action status updated:', response.data);
+  
+      
+      window.alert('Status saved successfully!');
+    })
+    .catch((error) => {
+      console.error('Failed to update action status:', error);
+  
+      
+      window.alert('Failed to save status. Please try again.');
+    });
+  };
+
+  const updateAssignedUser = (index, assignedUser) => {
+    const updatedAssignedUsers = [...assignedUsers];
+    updatedAssignedUsers[index] = assignedUser;
+    setAssignedUsers(updatedAssignedUsers);
+  };
 
   return (
     <div className="ml-8 justify-center text-4xl">
@@ -136,6 +186,21 @@ const Accident = () => {
           <option value="December">December</option>
         </select>
       </div>
+
+      <div className="mt-4">
+        <div className="flex">
+          {["All", "Solved", "Resolved", "Closed Case"].map((status) => (
+            <button
+              key={status}
+              className={`tab ${selectedTab === status ? "active-tab" : ""}`}
+              onClick={() => handleTabClick(status)}
+            >
+              <span className="tab-name">{status}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      
       <div className="mt-4">
         <input
           type="text"
@@ -171,16 +236,20 @@ const Accident = () => {
                 Date
               </th>
               <th className="text-white text-lg font-semibold text-center">
-                Solved
+                Action Status
               </th>
+              <th className="text-white text-lg font-semibold text-center">
+                Assigned
+              </th>
+              
               <th className="text-white text-lg font-semibold text-center">
                 Action
               </th>
             </tr>
           </thead>
           <tbody>
-            {filteredAccidents.map((accident, index) => (
-              <tr key={accident.id}>
+            {filteredAccidentsByStatus().map((accident, index) => (
+              <tr key={accident._id}>
                 <td className="text-white text-md font-base text-center">
                   {index + 1}
                 </td>
@@ -207,37 +276,56 @@ const Accident = () => {
                   })}
                 </td>
                 <td className="text-white text-md font-base text-center">
-                  <Checkbox checked={accident.isSolved} />
+                <select
+  value={actionStatus[index] || "InProgress"} 
+  onChange={(e) => updateActionStatus(index, e.target.value)}
+  className="px-2 py-1 fs-5 rounded-lg text-md"
+>
+  <option value="InProgress">In Progress</option> 
+  <option value="Solved">Solved</option>
+  <option value="Resolved">Resolved</option>
+  <option value="Closed Case">Closed Case</option>
+  
+</select>
                 </td>
-                <td className="flex gap-2">
+                <td className="text-white text-md font-base text-center">
+                <select
+  value={assignedUsers[index]}
+  onChange={(e) => updateAssignedUser(index, e.target.value)}
+  className="px-2 py-1 fs-5 rounded-lg text-md"
+>
+  <option value="">Unassigned</option>
+  <option value="user1">PO1 - Juan Dela Cruz</option>
+  <option value="user2">SPO1 - Pedro Penduko</option>
+  
+</select>
+</td>
+                <td className="flex items-center">
                   <div className="mr-1">
                     <UpdateAccident id={accident._id} />
                   </div>
-                  <div>
+                  <div className="mr-1">
                     <DeleteAccident id={accident._id} />
                   </div>
-                  {accident.isSolved ? (
-                    // Hide the "Close Case" button when isSolved is checked
-                    <div>
-                      {/* No button here */}
-                    </div>
-                  ) : (
-                    <div>
-                      <button
-                        onClick={() => caseClosed({ id: accident._id })}
-                        className="bg-[#5F9EA0] font-medium text-white rounded-md py-[5px] px-1"
-                      >
-                        Close the Case
-                      </button>
-                    </div>
-                  )}
+                  <div className="mr-1">
+                    <button
+                      className="btn btn-primary btn-sm text-white"
+                      onClick={() => openModal(accident)}
+                    >
+                      View
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <div></div>
+      <div>
+        {selectedAccident && (
+          <ViewAccidentModal accidentData={selectedAccident} onClose={closeModal} />
+        )}
+      </div>
     </div>
   );
 };

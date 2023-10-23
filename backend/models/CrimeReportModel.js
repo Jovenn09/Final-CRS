@@ -24,7 +24,12 @@ const crimeSchema = mongoose.Schema({
     date_of_report: {
         type: Date,
         default: Date.now
-    }
+    },
+    action_status: {
+        type: String,
+        enum: ["InProgress", "Solved", "Resolved", "Closed Case"],
+        default: "InProgress",
+    },
 }, {
     timestamps: true
 })

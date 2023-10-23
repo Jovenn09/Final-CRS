@@ -183,6 +183,27 @@ const deltMultiAccident = asyncHandler (async (req, res) => {
     res.status(200).json({ id: req.params.id})
 })
 
+// status ito
+const updateActionStatus = asyncHandler(async (req, res) => {
+    try {
+        const accidentRecord = await Accident.findById(req.params.id);
+
+        if (!accidentRecord) {
+            res.status(404).json({ error: 'Accident Report not found' });
+            return;
+        }
+
+        accidentRecord.action_status = req.body.actionStatus; 
+
+        
+        await accidentRecord.save();
+
+        res.status(200).json(accidentRecord);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update action status' });
+    }
+});
+
 module.exports = {
     getAccident,
     getOneAccident,
@@ -193,5 +214,6 @@ module.exports = {
     updateAccident,
     updateOngoingAccident,
     deltAccident,
+    updateActionStatus,
     deltMultiAccident
 }

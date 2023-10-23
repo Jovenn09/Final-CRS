@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import AddCrime from "./crimes/AddCrime.jsx";
 import UpdateCrime from "./crimes/UpdateCrime.jsx";
 import DeleteCrime from "./crimes/DeleteCrime.jsx";
+import ViewCrimeModal from "./ViewCrimeModal.jsx";
+import "./ViewAccidentModal.css";
 
 const Crime = () => {
   const [name, setName] = useState("");
@@ -11,6 +13,25 @@ const Crime = () => {
   const [selectedCrimeType, setSelectedCrimeType] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("");
+  const [selectedCrime, setSelectedCrime] = useState(null);
+  const [actionStatus, setActionStatus] = useState([]);
+  const [selectedTab, setSelectedTab] = useState("All");
+  const [assignedUsers, setAssignedUsers] = useState(new Array(crimes.length).fill(''));
+
+
+  const filteredCrimesByStatus = () => {
+    if (selectedTab === "All") {
+      return filteredCrimes;
+    } else {
+      return filteredCrimes.filter((crime, index) => {
+        return actionStatus[index] === selectedTab;
+      });
+    }
+  };
+
+  const handleTabClick = (tab) => {
+    setSelectedTab(tab);
+  };
 
   useEffect(() => {
     getUser();
@@ -31,17 +52,16 @@ const Crime = () => {
   };
 
   const getCrimes = () => {
-    // const token = localStorage.getItem("token");
     axios.get(`http://localhost:5000/api/crime-report`)
-    .then(result => {
-      console.log(result)
-      setCrimes(result.data)
-    })
-    .catch(err => console.log(err));
-    // console.log(crimes.data.paging.page);
-    // const data = crimes.data.data;
-    // setCrimes(data);
+      .then((result) => {
+        console.log(result);
+        setCrimes(result.data);
+        const initialActionStatus = result.data.map((crime) => crime.action_status);
+        setActionStatus(initialActionStatus);
+      })
+      .catch((err) => console.log(err));
   };
+
   const filteredCrimes = crimes.filter((crime) => {
     const searchString = searchQuery.toLowerCase();
     const crimeMonth = new Date(crime.incident_date).toLocaleString("default", { month: "long" });
@@ -55,18 +75,47 @@ const Crime = () => {
     );
   });
 
-  const Checkbox = ({ checked }) => (
-    <input type="checkbox" checked={checked} disabled readOnly />
-  )
+  // open crime
+   const openCrimeModal = (crimeData) => {
+    setSelectedCrime(crimeData);
+  };
 
-  const caseClosed = ({id}) => {
-    axios.put(`http://localhost:5000/api/solved-crime/solve-crime-report/${id}`)
-    .then(result => {
-      console.log(result)
-      window.location.reload()
+  
+  const closeCrimeModal = () => {
+    setSelectedCrime(null);
+  };
+
+
+// status
+  const updateActionStatus = (index, newStatus) => {
+    const updatedStatus = [...actionStatus];
+    updatedStatus[index] = newStatus;
+    setActionStatus(updatedStatus);
+  
+    
+    axios.put(`http://localhost:5000/api/crime-report/${crimes[index]._id}/action-status`, {
+      actionStatus: newStatus,
     })
-    .catch(err => console.log(err));
-  }
+    .then((response) => {
+      console.log('Action status updated:', response.data);
+  
+      
+      window.alert('Status saved successfully!');
+    })
+    .catch((error) => {
+      console.error('Failed to update action status:', error);
+  
+      
+      window.alert('Failed to save status. Please try again.');
+    });
+  };
+
+  const updateAssignedUser = (index, assignedUser) => {
+    const updatedAssignedUsers = [...assignedUsers];
+    updatedAssignedUsers[index] = assignedUser;
+    setAssignedUsers(updatedAssignedUsers);
+  };
+  
 
   return (
     <div className="ml-8 justify-center text-4xl">
@@ -148,6 +197,20 @@ const Crime = () => {
         </select>
       </div>
       <div className="mt-4">
+      <div className="flex">
+  {["All", "Solved", "Resolved", "Closed Case"].map((status) => (
+    <button
+      key={status}
+      className={`tab ${selectedTab === status ? "active-tab" : ""}`}
+      onClick={() => handleTabClick(status)}
+    >
+      <span className="tab-name">{status}</span>
+    </button>
+  ))}
+</div>
+</div>
+      
+      <div className="mt-4">
         <input
           type="text"
           placeholder="Search..."
@@ -176,7 +239,10 @@ const Crime = () => {
                 Time
               </th>
               <th className="text-white text-lg font-semibold text-center">
-                Solved
+                Action Status
+              </th>
+              <th className="text-white text-lg font-semibold text-center">
+                Assigned
               </th>
               <th className="text-white text-lg font-semibold text-center">
                 Action
@@ -184,7 +250,7 @@ const Crime = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredCrimes.map((crime, index) => (
+          {filteredCrimesByStatus().map((crime, index) => (
               <tr key={crime.id}>
                 <td className="text-white text-md font-base text-center">
                   {index + 1}
@@ -206,35 +272,53 @@ const Crime = () => {
                   })}
                 </td>
                 <td className="text-white text-md font-base text-center">
-                  <Checkbox checked={crime.isSolved} />
-                </td>
-                <td className="flex gap-2">
+  <select
+    value={actionStatus[index] || "InProgress"}
+    onChange={(e) => updateActionStatus(index, e.target.value)}
+    className="px-2 py-1 fs-5 rounded-lg text-md"
+  >
+    <option value="InProgress">In Progress</option>
+    <option value="Solved">Solved</option>
+    <option value="Resolved">Resolved</option>
+    <option value="Closed Case">Closed Case</option>
+  </select>
+</td>
+<td className="text-white text-md font-base text-center">
+  <select
+    value={assignedUsers[index]}
+    onChange={(e) => updateAssignedUser(index, e.target.value)}
+    className="px-2 py-1 fs-5 rounded-lg text-md"
+  >
+    <option value="">Unassigned</option>
+    <option value="user1">PO1 - Juan Dela Cruz</option>
+    <option value="user2">SPO1 - Pedro Penduko</option>
+    
+  </select>
+</td>
+                <td className="flex">
                   <div className="mr-1">
                     <UpdateCrime id={crime._id} />
                   </div>
-                  <div>
+                  <div className="mr-1">
                     <DeleteCrime id={crime._id} />
                   </div>
-                  {crime.isSolved ? (
-                    // Hide the "Close Case" button when isSolved is checked
-                    <div>
-                      {/* No button here */}
-                    </div>
-                  ) : (
-                    <div>
-                      <button
-                        onClick={() => caseClosed({ id: crime._id })}
-                        className="bg-[#5F9EA0] font-medium text-white rounded-md py-[5px] px-1"
-                      >
-                        Close the Case
-                      </button>
-                    </div>
-                  )}
+                  <div className="mr-1">
+                    <button
+                      className="btn btn-primary btn-sm text-white"
+                      onClick={() => openCrimeModal(crime)}
+                    >
+                      View
+                    </button>
+                  </div>
                 </td>
+                
               </tr>
             ))}
           </tbody>
         </table>
+        {selectedCrime && (
+          <ViewCrimeModal crimeData={selectedCrime} onClose={closeCrimeModal} />
+        )}
       </div>
     </div>
   );

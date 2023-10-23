@@ -176,6 +176,25 @@ const deltMultiCrime = asyncHandler (async (req, res) => {
     res.status(200).json({ id: req.params.id})
 })
 
+const updateCrimeStatus = asyncHandler(async (req, res) => {
+    try {
+        const crimeRecord = await Crime.findById(req.params.id);
+
+        if (!crimeRecord) {
+            res.status(404).json({ error: 'Crime Report not found' });
+            return;
+        }
+
+        crimeRecord.action_status = req.body.actionStatus;
+
+        await crimeRecord.save();
+
+        res.status(200).json(crimeRecord);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update action status' });
+    }
+});
+
 module.exports = {
     getCrime,
     getOneCrime,
@@ -186,5 +205,6 @@ module.exports = {
     updateCrime,
     updateOngoingCrime,
     deltCrime,
+    updateCrimeStatus,
     deltMultiCrime
 }
